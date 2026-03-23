@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Plus, Trash2, ArrowLeft, CheckCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const ADMIN_AUTH_KEY = "mil_barcode_admin_auth";
 
@@ -45,6 +46,8 @@ function UnauthorizedView() {
 
 function AdminContent() {
   const router = useRouter();
+  const supabase = createClient();
+
   const [entries, setEntries] = useState<ListEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,21 +56,27 @@ function AdminContent() {
   const [newSerial, setNewSerial] = useState("");
   const [errors, setErrors] = useState<{ id?: string; serial?: string }>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Load initial data from list.json
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetch("/list.json");
-        const data: ListEntry[] = await res.json();
-        setEntries(data);
-      } catch {
-        setEntries([]);
-      } finally {
-        setLoading(false);
-      }
+  // Load data from Supabase
+  async function loadEntries() {
+    const { data, error } = await supabase
+      .from("mil_db")
+      .select("id, serial")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to load entries:", error);
+      setEntries([]);
+    } else {
+      setEntries(data ?? []);
     }
-    loadData();
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Clear success message after 3 seconds
@@ -98,31 +107,57 @@ function AdminContent() {
       newErrors.id = "이미 등록된 군번입니다.";
     }
 
+    // Check for duplicate serial
+    if (newSerial.trim() && entries.some((e) => e.serial === newSerial.trim())) {
+      newErrors.serial = "이미 등록된 시리얼번호입니다.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
-  function handleAddEntry(e: React.FormEvent) {
+  async function handleAddEntry(e: React.FormEvent) {
     e.preventDefault();
     setSuccessMessage("");
 
     if (!validateForm()) return;
 
-    const newEntry: ListEntry = {
+    setSubmitting(true);
+
+    const { error } = await supabase.from("mil_db").insert({
       id: newId.trim(),
       serial: newSerial.trim(),
-    };
+    });
 
-    setEntries((prev) => [...prev, newEntry]);
+    if (error) {
+      if (error.code === "23505") {
+        // Unique constraint violation
+        setErrors({ id: "이미 등록된 군번 또는 시리얼번호입니다." });
+      } else {
+        setErrors({ id: "추가에 실패했습니다. 다시 시도해주세요." });
+      }
+      setSubmitting(false);
+      return;
+    }
+
     setNewId("");
     setNewSerial("");
     setErrors({});
     setSuccessMessage("새 항목이 추가되었습니다.");
+    await loadEntries();
+    setSubmitting(false);
   }
 
-  function handleDeleteEntry(id: string) {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+  async function handleDeleteEntry(id: string) {
+    const { error } = await supabase.from("mil_db").delete().eq("id", id);
+
+    if (error) {
+      console.error("Failed to delete:", error);
+      return;
+    }
+
     setSuccessMessage("항목이 삭제되었습니다.");
+    await loadEntries();
   }
 
   function handleLogout() {
@@ -188,6 +223,7 @@ function AdminContent() {
                 placeholder="예: 25-72000001"
                 className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring"
                 autoComplete="off"
+                disabled={submitting}
               />
               {errors.id && (
                 <p className="text-sm text-destructive">{errors.id}</p>
@@ -215,6 +251,7 @@ function AdminContent() {
                 maxLength={6}
                 className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring tracking-widest"
                 autoComplete="off"
+                disabled={submitting}
               />
               {errors.serial && (
                 <p className="text-sm text-destructive">{errors.serial}</p>
@@ -224,10 +261,15 @@ function AdminContent() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm"
+              disabled={submitting}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm disabled:opacity-50"
             >
-              <Plus className="w-4 h-4" />
-              항목 추가
+              {submitting ? (
+                <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {submitting ? "추가 중..." : "항목 추가"}
             </button>
           </form>
         </section>
@@ -277,9 +319,7 @@ function AdminContent() {
 
         {/* Note */}
         <p className="text-xs text-muted-foreground text-center px-4">
-          변경사항은 현재 세션에만 반영됩니다.
-          <br />
-          영구 저장을 위해서는 백엔드 연동이 필요합니다.
+          데이터는 Supabase에 실시간으로 저장됩니다.
         </p>
       </div>
     </main>

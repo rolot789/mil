@@ -100,7 +100,8 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
     svgEl: SVGSVGElement,
     label: string,
     badgeBg: string,
-    badgeFg: string
+    badgeFg: string,
+    borderColor: string
   ): Promise<string> {
     const DPR = 2;
     const W = 360;
@@ -121,10 +122,10 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
     roundRect(ctx, 0, 0, W, TOTAL_H, 16);
     ctx.fill();
 
-    // Border
-    ctx.strokeStyle = "#e4e4e7";
-    ctx.lineWidth = 1;
-    roundRect(ctx, 0.5, 0.5, W - 1, TOTAL_H - 1, 16);
+    // Colored border (2px)
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 2;
+    roundRect(ctx, 1, 1, W - 2, TOTAL_H - 2, 15);
     ctx.stroke();
 
     // Badge pill
@@ -165,8 +166,9 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
     const dataUrl = await renderBarcodeCanvas(
       svgEl,
       isEntry ? "입영 바코드" : "퇴영 바코드",
-      isEntry ? "#dcfce7" : "#ffedd5",
-      isEntry ? "#166534" : "#9a3412"
+      isEntry ? "#dbeafe" : "#fee2e2",
+      isEntry ? "#1d4ed8" : "#b91c1c",
+      isEntry ? "#2563eb" : "#dc2626"
     );
 
     const a = document.createElement("a");
@@ -229,19 +231,29 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
 
       {/* Barcode card — only one visible at a time */}
       <div className="w-full max-w-sm">
-        {/* Entry */}
+        {/* Entry — blue theme */}
         <div
           className={[
-            "bg-white border border-border rounded-2xl shadow-sm overflow-hidden",
+            "rounded-2xl shadow-sm overflow-hidden",
             activeTab === "entry" ? "block" : "hidden",
           ].join(" ")}
+          style={{
+            border: "2px solid #2563eb",
+            backgroundColor: "rgba(37, 99, 235, 0.03)",
+          }}
           aria-hidden={activeTab !== "entry"}
         >
-          <div className="px-5 pt-5 pb-4 border-b border-border bg-muted/30">
+          <div
+            className="px-5 pt-5 pb-4"
+            style={{
+              borderBottom: "1px solid rgba(37, 99, 235, 0.15)",
+              backgroundColor: "rgba(37, 99, 235, 0.05)",
+            }}
+          >
             <div className="flex items-center gap-2">
               <span
                 className="inline-flex items-center rounded-full px-3 py-0.5 text-xs font-semibold"
-                style={{ backgroundColor: "#dcfce7", color: "#166534" }}
+                style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
               >
                 입영
               </span>
@@ -259,19 +271,29 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
           </div>
         </div>
 
-        {/* Exit */}
+        {/* Exit — red theme */}
         <div
           className={[
-            "bg-white border border-border rounded-2xl shadow-sm overflow-hidden",
+            "rounded-2xl shadow-sm overflow-hidden",
             activeTab === "exit" ? "block" : "hidden",
           ].join(" ")}
+          style={{
+            border: "2px solid #dc2626",
+            backgroundColor: "rgba(220, 38, 38, 0.03)",
+          }}
           aria-hidden={activeTab !== "exit"}
         >
-          <div className="px-5 pt-5 pb-4 border-b border-border bg-muted/30">
+          <div
+            className="px-5 pt-5 pb-4"
+            style={{
+              borderBottom: "1px solid rgba(220, 38, 38, 0.15)",
+              backgroundColor: "rgba(220, 38, 38, 0.05)",
+            }}
+          >
             <div className="flex items-center gap-2">
               <span
                 className="inline-flex items-center rounded-full px-3 py-0.5 text-xs font-semibold"
-                style={{ backgroundColor: "#ffedd5", color: "#9a3412" }}
+                style={{ backgroundColor: "#fee2e2", color: "#b91c1c" }}
               >
                 퇴영
               </span>
