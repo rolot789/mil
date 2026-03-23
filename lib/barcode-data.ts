@@ -1,15 +1,24 @@
+import { createClient } from "@/lib/supabase/client";
+
 // Types for the barcode data
 export interface BarcodeEntry {
   id: string;
   serial: string;
 }
 
-// Fetch and search the local list.json dataset
+// Fetch and search from Supabase mil_db table
 export async function findEntryById(militaryId: string): Promise<BarcodeEntry | null> {
-  const response = await fetch("/list.json");
-  const data: BarcodeEntry[] = await response.json();
+  const supabase = createClient();
   const trimmed = militaryId.trim();
-  return data.find((entry) => entry.id === trimmed) ?? null;
+
+  const { data, error } = await supabase
+    .from("mil_db")
+    .select("id, serial")
+    .eq("id", trimmed)
+    .single();
+
+  if (error || !data) return null;
+  return { id: data.id, serial: data.serial };
 }
 
 // Generate the entry and exit barcode values from a serial
