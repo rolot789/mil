@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { findEntryById } from "@/lib/barcode-data";
 import { ArrowRight, ScanBarcode, Lock } from "lucide-react";
 
-const CORRECT_PASSWORD = "7136";
+const USER_PASSWORD = "7136";
+const ADMIN_PASSWORD = "7430";
 const AUTH_KEY = "mil_barcode_auth";
+const ADMIN_AUTH_KEY = "mil_barcode_admin_auth";
 
 // ─── Password Gate ───────────────────────────────────────────────────────────
 
-function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
+function PasswordGate({ onUserSuccess, onAdminSuccess }: { onUserSuccess: () => void; onAdminSuccess: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,9 +21,14 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     setTimeout(() => {
-      if (password === CORRECT_PASSWORD) {
+      if (password === USER_PASSWORD) {
         sessionStorage.setItem(AUTH_KEY, "1");
-        onSuccess();
+        sessionStorage.removeItem(ADMIN_AUTH_KEY);
+        onUserSuccess();
+      } else if (password === ADMIN_PASSWORD) {
+        sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
+        sessionStorage.removeItem(AUTH_KEY);
+        onAdminSuccess();
       } else {
         setError("비밀번호가 올바르지 않습니다.");
         setPassword("");
@@ -183,18 +190,33 @@ function MainPage() {
 // ─── Root Page ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  const router = useRouter();
+  const [authState, setAuthState] = useState<"loading" | "none" | "user" | "admin">("loading");
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(AUTH_KEY);
-    setAuthed(stored === "1");
-  }, []);
+    const userAuth = sessionStorage.getItem(AUTH_KEY);
+    const adminAuth = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    
+    if (adminAuth === "1") {
+      // Admin is already authenticated, redirect to admin page
+      router.replace("/admin");
+    } else if (userAuth === "1") {
+      setAuthState("user");
+    } else {
+      setAuthState("none");
+    }
+  }, [router]);
 
   // Avoid flash: render nothing until auth state is known
-  if (authed === null) return null;
+  if (authState === "loading") return null;
 
-  if (!authed) {
-    return <PasswordGate onSuccess={() => setAuthed(true)} />;
+  if (authState === "none") {
+    return (
+      <PasswordGate
+        onUserSuccess={() => setAuthState("user")}
+        onAdminSuccess={() => router.replace("/admin")}
+      />
+    );
   }
 
   return <MainPage />;
