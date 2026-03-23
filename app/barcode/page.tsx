@@ -157,25 +157,22 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
     return canvas.toDataURL("image/png");
   }
 
-  async function handleSaveImages() {
-    if (!entrySvgRef.current || !exitSvgRef.current) return;
+  async function handleSaveImage() {
+    const isEntry = activeTab === "entry";
+    const svgEl = isEntry ? entrySvgRef.current : exitSvgRef.current;
+    if (!svgEl) return;
 
-    // Render both in parallel
-    const [entryDataUrl, exitDataUrl] = await Promise.all([
-      renderBarcodeCanvas(entrySvgRef.current, "입영 바코드", "#dcfce7", "#166534"),
-      renderBarcodeCanvas(exitSvgRef.current, "퇴영 바코드", "#ffedd5", "#9a3412"),
-    ]);
+    const dataUrl = await renderBarcodeCanvas(
+      svgEl,
+      isEntry ? "입영 바코드" : "퇴영 바코드",
+      isEntry ? "#dcfce7" : "#ffedd5",
+      isEntry ? "#166534" : "#9a3412"
+    );
 
-    // Trigger both downloads
-    for (const [dataUrl, filename] of [
-      [entryDataUrl, "입영-바코드.png"],
-      [exitDataUrl, "퇴영-바코드.png"],
-    ] as [string, string][]) {
-      const a = document.createElement("a");
-      a.download = filename;
-      a.href = dataUrl;
-      a.click();
-    }
+    const a = document.createElement("a");
+    a.download = isEntry ? "입영-바코드.png" : "퇴영-바코드.png";
+    a.href = dataUrl;
+    a.click();
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -293,18 +290,14 @@ function BarcodeOutputPage({ id, entry, exit, onBack }: BarcodeOutputPageProps) 
         </div>
       </div>
 
-      {/* Download button — always downloads both */}
+      {/* Download button — downloads only the active barcode */}
       <button
-        onClick={handleSaveImages}
+        onClick={handleSaveImage}
         className="mt-6 w-full max-w-sm flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm"
       >
         <Download className="w-4 h-4" />
-        바코드 저장
+        {activeTab === "entry" ? "입영 바코드 저장" : "퇴영 바코드 저장"}
       </button>
-
-      <p className="mt-3 text-xs text-muted-foreground text-center">
-        입영·퇴영 바코드가 각각 PNG로 저장됩니다
-      </p>
     </main>
   );
 }
